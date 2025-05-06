@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Останні новини</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .news-item {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 20px;
+        }
+
+        .news-image-container {
+            width: 200px;
+            height: 150px;
+            overflow: hidden;
+            border-radius: 5px;
+        }
+
+        .news-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .news-content {
+            flex: 1;
+        }
+
+        .news-title {
+            color: #2c3e50;
+            text-decoration: none;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .news-title:hover {
+            color: #3498db;
+        }
+
+        .news-date {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin: 10px 0;
+        }
+
+        .news-description {
+            color: #34495e;
+            line-height: 1.5;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .error-message {
+            background-color: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .info-message {
+            background-color: #3498db;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+            padding: 20px;
+        }
+
+        .refresh-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px auto;
+            display: block;
+        }
+
+        .refresh-button:hover {
+            background-color: #2980b9;
+        }
+
+        @media (max-width: 600px) {
+            .news-item {
+                grid-template-columns: 1fr;
+            }
+
+            .news-image-container {
+                width: 100%;
+                height: 200px;
+            }
+        }
+
+        #status-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .status-online {
+            background-color: #2ecc71;
+        }
+
+        .status-offline {
+            background-color: #e74c3c;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Останні новини</h1>
+    <div id="status-container">
+        <span class="status-indicator" id="status-dot"></span>
+        <span id="status-text">Перевірка з'єднання...</span>
+    </div>
+    <div id="error-container" class="error-message"></div>
+    <button class="refresh-button" onclick="fetchNews()">Оновити новини</button>
+    <div id="news-container">
+        <div class="loading">Завантаження новин...</div>
+    </div>
+
+    <script>
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+
+            return `${hours}:${minutes}, ${day}.${month}.${year}`;
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.style.display = 'block';
+            errorContainer.textContent = message;
+        }
+
+        function hideError() {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.style.display = 'none';
+        }
+
+        function getDefaultImage() {
+            return 'https://via.placeholder.com/400x300.png?text=Немає+зображення';
+        }
+
+        function updateStatus(isOnline) {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+
+            statusDot.className = 'status-indicator ' + (isOnline ? 'status-online' : 'status-offline');
+            statusText.textContent = isOnline ? 'Сервіс онлайн' : 'Сервіс офлайн';
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch('http://localhost:8000/api/health');
+                const data = await response.json();
+                updateStatus(data.status === 'healthy');
+            } catch (error) {
+                updateStatus(false);
+            }
+        }
+
+        async function fetchNews() {
+            try {
+                hideError();
+                const container = document.getElementById('news-container');
+                container.innerHTML = '<div class="loading">Завантаження новин...</div>';
+
+                const response = await fetch('http://localhost:8000/api/news');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    container.innerHTML = `
+                        <div class="info-message">
+                            ${data.message || 'Помилка завантаження новин'}
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    container.innerHTML = `
+                        <div class="info-message">
+                            Наразі немає новин для відображення. 
+                            Зачекайте, поки RSS парсер завантажить нові новини.
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = data.map(item => `
+                    <div class="news-item">
+                        <div class="news-image-container">
+                            <img class="news-image" 
+                                src="${item.image || getDefaultImage()}" 
+                                alt="${item.title}"
+                                onerror="this.src='${getDefaultImage()}'">
+                        </div>
+                        <div class="news-content">
+                            <a href="${item.link}" class="news-title" target="_blank">
+                                ${item.title}
+                            </a>
+                            <div class="news-date">
+                                ${formatDate(item.pubDate)}
+                            </div>
+                            <div class="news-description">
+                                ${item.description}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching news:', error);
+                showError('Помилка підключення до сервера. Перевірте, чи запущені всі сервіси та спробуйте оновити сторінку.');
+            }
+        }
+
+        // Initial health check and news fetch
+        checkHealth();
+        fetchNews();
+
+        // Update health status every 30 seconds
+        setInterval(checkHealth, 30000);
+
+        // Update news every 30 seconds
+        setInterval(fetchNews, 30 * 1000);
+    </script>
+</body>
+
+</html>
